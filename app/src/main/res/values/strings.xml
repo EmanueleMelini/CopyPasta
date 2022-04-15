@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">CopyPasta</string>
+    <string name="conn_error">Connection error, retry later.</string>
+    <string name="unexpected_return">Unexpected return.</string>
+    <string name="missing_parameters">Insert all fields.</string>
 </resources>

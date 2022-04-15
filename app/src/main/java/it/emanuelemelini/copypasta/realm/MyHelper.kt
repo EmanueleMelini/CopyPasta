@@ -1,24 +1,18 @@
-package it.emanuelemelini.copypasta.realm;
+package it.emanuelemelini.copypasta.realm
 
-import io.realm.Realm;
-import io.realm.RealmResults;
-import it.emanuelemelini.copypasta.model.Login;
+import io.realm.Realm
+import io.realm.RealmResults
+import it.emanuelemelini.copypasta.model.Login
 
-public class MyHelper {
+class MyHelper(private var realm: Realm) {
+    private lateinit var login: RealmResults<Login>
 
-    Realm realm;
-    RealmResults<Login> login;
-
-    public MyHelper(Realm realm) {
-        this.realm = realm;
+    fun saveLoginFromDB() {
+        login = realm.where(Login::class.java).findAll()
     }
 
-    public void saveLoginFromDB() {
-        login = realm.where(Login.class).findAll();
-    }
-
-    public Login getLogin() {
-        return login.first();
+    fun getLogin(): Login? {
+        return login.first()
     }
 
 }

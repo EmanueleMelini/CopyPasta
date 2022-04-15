@@ -1,31 +1,32 @@
-package it.emanuelemelini.copypasta.utils;
+package it.emanuelemelini.copypasta.utils
 
-import android.content.Context;
-import android.content.res.Resources;
-import android.util.Log;
+import android.content.Context
+import android.content.res.Resources
+import java.io.InputStream
+import it.emanuelemelini.copypasta.R
+import android.content.res.Resources.NotFoundException
+import android.util.Log
+import java.io.IOException
+import java.lang.Exception
+import java.util.*
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Properties;
+class ConfigHelper {
 
-import it.emanuelemelini.copypasta.R;
+    companion object {
 
-public class ConfigHelper {
-
-    public static String getConfigValue(Context context, String name) {
-        Resources resources = context.getResources();
-
-        try {
-            InputStream rawResource = resources.openRawResource(R.raw.config);
-            Properties properties = new Properties();
-            properties.load(rawResource);
-            return properties.getProperty(name);
-        } catch (Resources.NotFoundException e) {
-            Log.e("Config", "Unable to find the config file: " + e.getMessage());
-        } catch (IOException e) {
-            Log.e("Config", "Failed to open config file.");
+        fun getConfigValue(context: Context, name: String): String {
+            val resources = context.resources
+            return try {
+                val rawResource = resources.openRawResource(R.raw.config)
+                val properties = Properties()
+                properties.load(rawResource)
+                properties.getProperty(name)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                "Error"
+            }
         }
 
-        return null;
     }
+
 }

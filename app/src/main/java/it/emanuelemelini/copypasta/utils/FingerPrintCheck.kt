@@ -1,14 +1,17 @@
-package it.emanuelemelini.copypasta.utils;
+package it.emanuelemelini.copypasta.utils
 
-import android.content.Context;
+import android.content.Context
+import androidx.biometric.BiometricManager
 
-import androidx.biometric.BiometricManager;
+class FingerPrintCheck {
 
-public class FingerPrintCheck {
+    companion object {
 
-    public static boolean check(Context c) {
-        BiometricManager biometricManager = androidx.biometric.BiometricManager.from(c);
-        return biometricManager.canAuthenticate(BiometricManager.Authenticators.DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS;
+        fun check(c: Context): Boolean {
+            val biometricManager = BiometricManager.from(c)
+            return biometricManager.canAuthenticate(BiometricManager.Authenticators.DEVICE_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS
+        }
+
     }
 
 }

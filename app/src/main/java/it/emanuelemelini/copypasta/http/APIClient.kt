@@ -1,36 +1,42 @@
-package it.emanuelemelini.copypasta.http;
+package it.emanuelemelini.copypasta.http
 
-import android.content.Context;
+import android.content.Context
+import com.google.gson.GsonBuilder
+import it.emanuelemelini.copypasta.utils.ConfigHelper
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+class APIClient {
 
-import it.emanuelemelini.copypasta.utils.ConfigHelper;
-import okhttp3.OkHttpClient;
-import okhttp3.logging.HttpLoggingInterceptor;
-import retrofit2.Retrofit;
-import retrofit2.converter.gson.GsonConverterFactory;
+    companion object {
 
-public class APIClient {
+        fun getClient(c: Context): Retrofit {
 
-    public static Retrofit getClient(Context c) {
+            val interceptor = HttpLoggingInterceptor()
+            interceptor.setLevel(HttpLoggingInterceptor.Level.BODY)
 
-        HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
-        interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
-        OkHttpClient client = new OkHttpClient.Builder().addInterceptor(interceptor).build();
+            val client: OkHttpClient = OkHttpClient.Builder()
+                .addInterceptor(interceptor)
+                .build()
 
-        Gson gson = new GsonBuilder()
+            val gson = GsonBuilder()
                 .setLenient()
-                .create();
+                .create()
 
-        String url = ConfigHelper.getConfigValue(c, "public_url");
-        if(url == null)
-            url = "";
+            var url = ConfigHelper.getConfigValue(c, "public_url")
 
-        return new Retrofit.Builder()
+            if (url == null) url = ""
+
+            return Retrofit.Builder()
                 .baseUrl(url)
                 .addConverterFactory(GsonConverterFactory.create(gson))
                 .client(client)
-                .build();
+                .build()
+
+        }
+
     }
+
 }

@@ -1,113 +1,160 @@
-package it.emanuelemelini.copypasta.ui;
+package it.emanuelemelini.copypasta.ui
 
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.Context;
-import android.os.Bundle;
-import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.Toast;
+import android.content.Context
+import android.os.Bundle
+import android.view.View
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ProgressBar
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricPrompt
+import androidx.biometric.BiometricPrompt.PromptInfo
+import androidx.core.content.ContextCompat
+import io.realm.Realm
+import it.emanuelemelini.copypasta.R
+import it.emanuelemelini.copypasta.http.APIClient
+import it.emanuelemelini.copypasta.http.APIInterface
+import it.emanuelemelini.copypasta.http.BaseResponse
+import it.emanuelemelini.copypasta.http.login.User
+import it.emanuelemelini.copypasta.model.Login
+import it.emanuelemelini.copypasta.realm.MyHelper
+import it.emanuelemelini.copypasta.utils.FingerPrintCheck
+import it.emanuelemelini.copypasta.utils.RunnablesUI
+import it.emanuelemelini.copypasta.utils.ToastUtils
+import kotlinx.android.synthetic.main.activity_login.*
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import java.util.concurrent.Executor
+import kotlin.math.log
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.biometric.BiometricPrompt;
-import androidx.core.content.ContextCompat;
+class LoginActivity : AppCompatActivity() {
 
-import java.util.concurrent.Executor;
+    private lateinit var loginFinger: Button
+    private lateinit var loginBtn: Button
+    private lateinit var username: EditText
+    private lateinit var password: EditText
+    private lateinit var progress: ProgressBar
 
-import io.realm.Realm;
-import it.emanuelemelini.copypasta.R;
-import it.emanuelemelini.copypasta.http.APIClient;
-import it.emanuelemelini.copypasta.http.APIInterface;
-import it.emanuelemelini.copypasta.model.Login;
-import it.emanuelemelini.copypasta.realm.MyHelper;
-import it.emanuelemelini.copypasta.utils.FingerPrintCheck;
+    private var first: Boolean = false
+    private lateinit var helper: MyHelper
+    private lateinit var realm: Realm
+    private lateinit var apiInterface: APIInterface
+    private var fingerprint: Boolean = false
+    private lateinit var executor: Executor
+    private lateinit var biometricPrompt: BiometricPrompt
+    private lateinit var promptInfo: PromptInfo
+    private lateinit var mContext: Context
 
-public class LoginActivity extends AppCompatActivity {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_login)
 
-    Button login_finger;
-    Button login_btn;
-    EditText username;
-    EditText password;
+        loginFinger = findViewById(R.id.fingerprint_button)
+        loginBtn = findViewById(R.id.login_button)
+        username = findViewById(R.id.login_username)
+        password = findViewById(R.id.login_password)
+        progress = findViewById(R.id.login_progress_bar)
 
-    boolean first;
-    Login login;
-    MyHelper helper;
-    Realm realm;
-    APIInterface apiInterface;
-    boolean fingerprint;
-    Executor executor;
-    BiometricPrompt biometricPrompt;
-    BiometricPrompt.PromptInfo promptInfo;
+        apiInterface = APIClient.getClient(this).create(APIInterface::class.java)
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_login);
-
-        login_finger = findViewById(R.id.fingerprint_button);
-        login_btn = findViewById(R.id.login_button);
-        username = findViewById(R.id.login_username);
-        password = findViewById(R.id.login_password);
-
-        apiInterface = APIClient.getClient(this).create(APIInterface.class);
-        realm = Realm.getDefaultInstance();
-        helper = new MyHelper(realm);
-        helper.saveLoginFromDB();
-        if (realm.where(Login.class).findFirst() == null) {
-            first = true;
+        realm = Realm.getDefaultInstance()
+        helper = MyHelper(realm)
+        helper.saveLoginFromDB()
+        if (realm.where(Login::class.java).findFirst() == null) {
+            first = true
         }
 
-        fingerprint = FingerPrintCheck.check(this);
-
-        executor = ContextCompat.getMainExecutor(this);
-
-        biometricPrompt = new BiometricPrompt(LoginActivity.this, executor, new BiometricPrompt.AuthenticationCallback() {
-            @Override
-            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
-                super.onAuthenticationError(errorCode, errString);
+        fingerprint = FingerPrintCheck.check(this)
+        executor = ContextCompat.getMainExecutor(this)
+        biometricPrompt = BiometricPrompt(this@LoginActivity, executor, object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                super.onAuthenticationError(errorCode, errString)
             }
 
-            @Override
-            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
-                super.onAuthenticationSucceeded(result);
-                //call login
-                Toast.makeText(getApplicationContext(), "Login Success", Toast.LENGTH_SHORT).show();
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                helper.saveLoginFromDB()
+                val lg = helper.getLogin()
+                if (lg != null)
+                    login(lg.username, lg.password)
+                Toast.makeText(applicationContext, "Login Success", Toast.LENGTH_SHORT).show()
             }
 
-            @Override
-            public void onAuthenticationFailed() {
-                super.onAuthenticationFailed();
+            override fun onAuthenticationFailed() {
+                super.onAuthenticationFailed()
             }
-        });
-
-        promptInfo = new BiometricPrompt.PromptInfo.Builder().setTitle("CopyPasta")
-                .setDescription("Use your fingerprint to login ").setNegativeButtonText("Cancel").build();
-
+        })
+        promptInfo = PromptInfo.Builder()
+            .setTitle("CopyPasta")
+            .setDescription("Use your fingerprint to login ")
+            .setNegativeButtonText("Cancel")
+            .build()
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
+    override fun onResume() {
+        super.onResume()
 
-        if(fingerprint && !first) {
-            biometricPrompt.authenticate(promptInfo);
-            login_finger.setVisibility(View.VISIBLE);
-            login_finger.setOnClickListener(v -> biometricPrompt.authenticate(promptInfo));
+        mContext = this
+
+        if (fingerprint && !first) {
+            biometricPrompt.authenticate(promptInfo)
+            loginFinger.visibility = View.VISIBLE
+            loginFinger.setOnClickListener {
+                biometricPrompt.authenticate(promptInfo)
+            }
         } else {
-            login_finger.setVisibility(View.GONE);
+            loginFinger.visibility = View.GONE
+        }
+        loginBtn.setOnClickListener {
+            if (username.text.toString().isNotBlank() && password.text.toString().isNotBlank()) {
+                login(username.text.toString(), password.text.toString())
+            }
         }
 
-        login_btn.setOnClickListener(v -> {
+    }
 
-        });
+    private fun login(usr: String, psw: String) {
 
-        /*
-        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        ClipData clip = ClipData.newPlainText("CopyPasta", copy_text.getText());
-        clipboard.setPrimaryClip(clip);
-         */
+        RunnablesUI.gone(loginBtn)
+        RunnablesUI.visible(progress)
+
+        val callLogin = apiInterface.login(
+            username = usr,
+            password = psw
+        )
+
+        callLogin.enqueue(object : Callback<BaseResponse<User>> {
+            override fun onResponse(call: Call<BaseResponse<User>>, response: Response<BaseResponse<User>>) {
+                RunnablesUI.gone(progress)
+                RunnablesUI.visible(loginBtn)
+                val loginRsp = response.body()
+                if (response.isSuccessful && loginRsp != null) {
+                    when (loginRsp.error) {
+                        0 -> {
+
+                        }
+                        1, 2 -> {
+                            ToastUtils.simpleToast(mContext, loginRsp.message)
+                        }
+                        else -> {
+                            ToastUtils.unexpectedReturnToast(mContext)
+                        }
+                    }
+                } else
+                    ToastUtils.connErrorToast(mContext)
+            }
+
+            override fun onFailure(call: Call<BaseResponse<User>>, t: Throwable) {
+                RunnablesUI.gone(progress)
+                RunnablesUI.visible(loginBtn)
+                t.printStackTrace()
+                ToastUtils.connErrorToast(mContext)
+            }
+
+        })
 
     }
+
 }
