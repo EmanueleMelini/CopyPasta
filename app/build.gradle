@@ -1,9 +1,9 @@
 plugins {
     id 'com.android.application'
-    id 'realm-android'
     id 'kotlin-android'
     id 'kotlin-android-extensions'
     id 'kotlin-kapt'
+    id 'realm-android'
     id 'androidx.navigation.safeargs.kotlin'
 }
 

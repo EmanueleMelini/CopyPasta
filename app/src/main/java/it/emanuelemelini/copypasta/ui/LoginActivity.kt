@@ -1,12 +1,11 @@
 package it.emanuelemelini.copypasta.ui
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
-import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ProgressBar
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricPrompt
 import androidx.biometric.BiometricPrompt.PromptInfo
@@ -16,18 +15,17 @@ import it.emanuelemelini.copypasta.R
 import it.emanuelemelini.copypasta.http.APIClient
 import it.emanuelemelini.copypasta.http.APIInterface
 import it.emanuelemelini.copypasta.http.BaseResponse
+import it.emanuelemelini.copypasta.http.login.BaseLoginResponse
 import it.emanuelemelini.copypasta.http.login.User
-import it.emanuelemelini.copypasta.model.Login
+import it.emanuelemelini.copypasta.model.LoginModel
 import it.emanuelemelini.copypasta.realm.MyHelper
 import it.emanuelemelini.copypasta.utils.FingerPrintCheck
 import it.emanuelemelini.copypasta.utils.RunnablesUI
 import it.emanuelemelini.copypasta.utils.ToastUtils
-import kotlinx.android.synthetic.main.activity_login.*
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import java.util.concurrent.Executor
-import kotlin.math.log
 
 class LoginActivity : AppCompatActivity() {
 
@@ -47,6 +45,8 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var promptInfo: PromptInfo
     private lateinit var mContext: Context
 
+    //TODO: think about remove native login or change login api
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
@@ -57,20 +57,24 @@ class LoginActivity : AppCompatActivity() {
         password = findViewById(R.id.login_password)
         progress = findViewById(R.id.login_progress_bar)
 
-        apiInterface = APIClient.getClient(this).create(APIInterface::class.java)
+        mContext = this
+
+        apiInterface = APIClient.getClient(mContext).create(APIInterface::class.java)
 
         realm = Realm.getDefaultInstance()
         helper = MyHelper(realm)
         helper.saveLoginFromDB()
-        if (realm.where(Login::class.java).findFirst() == null) {
+        if (realm.where(LoginModel::class.java).findFirst() == null) {
             first = true
         }
 
-        fingerprint = FingerPrintCheck.check(this)
-        executor = ContextCompat.getMainExecutor(this)
+
+        fingerprint = FingerPrintCheck.check(mContext)
+        executor = ContextCompat.getMainExecutor(mContext)
         biometricPrompt = BiometricPrompt(this@LoginActivity, executor, object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
+                ToastUtils.simpleToast(mContext, "Fingerprint authentication error")
             }
 
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -79,11 +83,12 @@ class LoginActivity : AppCompatActivity() {
                 val lg = helper.getLogin()
                 if (lg != null)
                     login(lg.username, lg.password)
-                Toast.makeText(applicationContext, "Login Success", Toast.LENGTH_SHORT).show()
+                ToastUtils.simpleToast(mContext, "Fingerprint authentication succeded")
             }
 
             override fun onAuthenticationFailed() {
                 super.onAuthenticationFailed()
+                ToastUtils.simpleToast(mContext, "Fingerprint authentication failed!")
             }
         })
         promptInfo = PromptInfo.Builder()
@@ -96,17 +101,19 @@ class LoginActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
 
+        RunnablesUI.visible(loginBtn)
+        RunnablesUI.gone(progress, loginFinger)
+
         mContext = this
 
         if (fingerprint && !first) {
             biometricPrompt.authenticate(promptInfo)
-            loginFinger.visibility = View.VISIBLE
+            RunnablesUI.visible(loginFinger)
             loginFinger.setOnClickListener {
                 biometricPrompt.authenticate(promptInfo)
             }
-        } else {
-            loginFinger.visibility = View.GONE
         }
+
         loginBtn.setOnClickListener {
             if (username.text.toString().isNotBlank() && password.text.toString().isNotBlank()) {
                 login(username.text.toString(), password.text.toString())
@@ -120,20 +127,30 @@ class LoginActivity : AppCompatActivity() {
         RunnablesUI.gone(loginBtn)
         RunnablesUI.visible(progress)
 
-        val callLogin = apiInterface.login(
+        /*var callLogin = apiInterface.loginOld(
             username = usr,
             password = psw
+        )*/
+
+        val callLogin = apiInterface.login(
+            loginModel = LoginModel(
+                username = usr,
+                password = psw
+            )
         )
 
-        callLogin.enqueue(object : Callback<BaseResponse<User>> {
-            override fun onResponse(call: Call<BaseResponse<User>>, response: Response<BaseResponse<User>>) {
+        callLogin.enqueue(object : Callback<BaseLoginResponse> {
+            override fun onResponse(call: Call<BaseLoginResponse>, response: Response<BaseLoginResponse>) {
                 RunnablesUI.gone(progress)
                 RunnablesUI.visible(loginBtn)
                 val loginRsp = response.body()
                 if (response.isSuccessful && loginRsp != null) {
                     when (loginRsp.error) {
                         0 -> {
-
+                            println(loginRsp)
+                            startActivity(Intent(mContext, WebviewActivity::class.java)
+                                .putExtra("Login", loginRsp))
+                            finish()
                         }
                         1, 2 -> {
                             ToastUtils.simpleToast(mContext, loginRsp.message)
@@ -146,7 +163,7 @@ class LoginActivity : AppCompatActivity() {
                     ToastUtils.connErrorToast(mContext)
             }
 
-            override fun onFailure(call: Call<BaseResponse<User>>, t: Throwable) {
+            override fun onFailure(call: Call<BaseLoginResponse>, t: Throwable) {
                 RunnablesUI.gone(progress)
                 RunnablesUI.visible(loginBtn)
                 t.printStackTrace()

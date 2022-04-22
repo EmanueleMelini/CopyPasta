@@ -25,9 +25,11 @@ class APIClient {
                 .setLenient()
                 .create()
 
-            var url = ConfigHelper.getConfigValue(c, "public_url")
+            var url = ConfigHelper.getConfigValue(c, "internal_url")
 
-            if (url == null) url = ""
+            if (url.lowercase().contentEquals("error")) url = ""
+
+            println("URL: $url")
 
             return Retrofit.Builder()
                 .baseUrl(url)
